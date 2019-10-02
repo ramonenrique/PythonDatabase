@@ -16,8 +16,6 @@ def connect_to_mssql():
 
 
 
-
-
 def mssql_create_query_json(p_conn_mssql,p_schema,p_table_name):
 
     #TEMPLATE IS create    view  v_export_table as SELECT   f1, f2, f3   from dbo.table
@@ -47,14 +45,14 @@ def mssql_create_query_json(p_conn_mssql,p_schema,p_table_name):
     try:
         lc.remove('SaveTimestamp')
     except:
-        print('Field Savetimetamp does not exist in this table, that is ok ', p_table_name, ' ***Exception handled ok***', time.ctime())
+        v_dummy='Field Savetimetamp does not exist in this table, that is ok ' #, p_table_name, ' ***Exception handled ok***', time.ctime())
 
 
     v_lc_str=""
     for x in lc:
         v_lc_str=v_lc_str+ "," + (x)
 
-    v_lc_str=v_lc_str[1:1000] #remove the first comma
+    v_lc_str=v_lc_str[1:5000] #remove the first comma
 
     #print('lcstr v_lc_str:',v_lc_str)
 
@@ -82,7 +80,7 @@ def mssql_export_bcp_json(p_conn_mssql,p_src_schema, p_table, p_mode='print', p_
     global mssql_port
 
     v_jsonqry=mssql_create_query_json(p_conn_mssql=p_conn_mssql,p_schema=p_src_schema,p_table_name=p_table)
-    print('vjsonquery:',v_jsonqry)
+    #print('vjsonquery:',v_jsonqry)
 
     v_file_name=p_table + "." + p_file_type
     v_file_name=v_file_name.lower()
@@ -103,19 +101,18 @@ def mssql_export_bcp_json(p_conn_mssql,p_src_schema, p_table, p_mode='print', p_
     path = "C://Program Files//Microsoft SQL Server//Client SDK//ODBC//130//Tools//Binn//" #make sure to use forward slash
     program = "bcp.exe"
     fullpath = '"' + path + program + '"'
-    # os.chdir(path)
-    # os.system(program)
 
     if p_mode == 'print':
         print(v_dos_mssql_bcp_command)
     elif p_mode == 'execute':
         try:
-            print("Attempting to export data for", p_table,"command=",v_dos_mssql_bcp_command)
+            print("Attempting to export data for", p_table) #adds too much noise:,"command=",v_dos_mssql_bcp_command)
             os.chdir(path)
             print("Directory set to:", os.getcwd())
             os.system(v_dos_mssql_bcp_command)
+            #print('Program [mssql_export_bcp_json sucessfully finished TABLE:',p_table, time.ctime())
         except:
-            print('Error executing bcp command')
+            print('Program [mssql_export_bcp_json:**Error** executing bcp command')
     return (v_dos_mssql_bcp_command)
 
 
@@ -234,10 +231,10 @@ def mssql_create_all_export_views_flat_file(conn_mssql,p_target_schema):
     for row in df_list_all.head(800).itertuples():
 
         # print('--PROCESSING TABLE:',row.table_name)
-        v_sql_cols="Select top(1000) * from dbo." + row.table_name
         dfcols=pd.read_sql("Select top(1000) * from dbo." + row.table_name,con=conn_mssql)
 
         lc=dfcols.columns.tolist()
+
         try:
             lc.remove('SaveTimestamp')
         except:
@@ -292,7 +289,7 @@ def mssql_create_export_views_json(p_conn_mssql,p_table_name,p_target_schema='Sl
     try:
         lc.remove('SaveTimestamp')
     except:
-        print('Field Savetimetamp does not exist in this table, that is ok ', p_table_name, ' ***Exception handled ok***', time.ctime())
+        v_st='Field Savetimetamp does not exist in this table, that is ok '
 
     lcstr= str(lc)
     lcstr=  lcstr.replace('[',' ')

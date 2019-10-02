@@ -58,7 +58,7 @@ print("DATABASE:",mssql_db)
 # v_jsonqry=mssql_create_query_json(p_conn_mssql=conn_mssql,p_schema="dbo",p_table_name="ba_Credit")
 # print(v_jsonqry)
 #
-mssql_export_bcp_json(conn_mssql,p_src_schema="dbo", p_table="Billing_InvHdrMaint", p_mode='execute', p_file_type='json')
+mssql_export_bcp_json(conn_mssql,p_src_schema="dbo", p_table="Billing_InvoiceDetail", p_mode='print', p_file_type='json')
 
 #mssql_bcp_export_schema_json(p_conn_mssql=conn_mssql,p_schema="dbo",p_which_tables="pending",p_mode="print")
 

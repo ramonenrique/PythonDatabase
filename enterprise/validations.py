@@ -105,7 +105,7 @@ def valid2_rowcount(conn_src,p_source_schema,p_source_table,conn_tgt,p_target_sc
 		v_comments=f'Source:{str(val_source_rowcount)} Target:{str(val_target_rowcount)} - Diff:' + str(diff)
 
 
-	print(time.ctime(),v_result,'COMMENTS:',v_comments)
+	print(f'Validation Table {p_target_schema}.{p_target_table} {v_result} COMMENTS: {v_comments}',time.ctime())
 	#print('Attempting to add row to the log dataframe/xls')
 	dfoutput=add_log_row(df=dfoutput, p_table_name=p_source_table, p_column_name='TABLE-CHECK', p_validation='2-Table Rowcount', p_result=v_result, p_comments=v_comments, p_source_value=None, p_target_value=None, p_sqlstmt=None)
 	print('--------------------------------------------------------------------------------------------------')
@@ -399,6 +399,7 @@ def temp_fix_count_distinct():
 		v_mssql_template="Select 	count(distinct	ltrim(rtrim(comment))) cd	from gasquest.dbo.locationoverridecapacity 	where 	locationoverridecapacityid 	between 1 and upper_limit 		and len(ltrim(rtrim(comment))) > 1 "
 
 		conmsql = connect_to_mssql()
+		print('temp_fix_count_distinct')
 		connred = connect_to_red()
 
 

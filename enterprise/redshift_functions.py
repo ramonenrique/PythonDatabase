@@ -117,21 +117,21 @@ def red_run_copy_command(conn_redshift,p_schema, p_table,p_mode='print'):
         v_rowcount_redshift = db_get_row_count_in_db(conn_redshift, p_schema=p_schema, p_table=p_table)
 
         if v_rowcount_redshift > 0:
-            print('Data already exists in the table, truncate table first and try again')
+            print('Data already exists in the table:',p_table, 'truncate table first and try again')
             return 0
         elif v_rowcount_redshift == 0:
             #TEMPLATE FOR COPY COMMAND  ="copy    p_schema.p_table    from  \'s3://bwp-gms-mikedey-special-chars/AsIsMigration/Redshift/p_schema/p_table.txt.gz\'  iam_role \'arn:aws:iam::599920608012:role/role-redshift-bwp-gms-data-dev\'  gzip  json 'auto' "
             cur = conn_redshift.cursor()
             cur.execute(v_redshift_command)
             v_rowcount_redshift_now=db_get_row_count_in_db(conn_redshift,p_schema=p_schema, p_table=v_table) #run again but now AFTER the statement has been executed
-            print(p_schema,p_table,' successfully loaded ',v_rowcount_redshift,'rowcount after:',v_rowcount_redshift_now)
+            print(f'Program [red_run_copy_command] successfully loaded {p_schema}.{p_table} Rowcount is {v_rowcount_redshift_now}', time.ctime())
             #it will print the command in all cases (print only mode and execute mode
             cur.close()
 
     #NOTE:The calling environment must handle the commits since it is at connection level not cursor levl.
     #We are going to have multiple tables loaded, there is no need to commit for each one.
 
-def red_run_copy_command_schema(conn_redshift=connect_to_red(), p_mode='execute', p_schema='gasquest2019',p_filter=""):
+def red_run_copy_command_schema(conn_redshift, p_mode='execute', p_schema='gasquest2019',p_filter=""):
 #The parameter target_schema allows to change the target schema where the data is being loaded to.
 
     list_tables = red_list_empty_tables(conn_redshift,p_schema)
@@ -143,8 +143,7 @@ def red_run_copy_command_schema(conn_redshift=connect_to_red(), p_mode='execute'
                 red_run_copy_command(conn_redshift, p_schema.lower(),x_table.lower(), p_mode)
             except:
                 print('Error loading from s3', x_table)
-        else:
-            print('Table excluded does not match filter ', p_filter, 'not in ',x_table)
     conn_redshift.commit()
+    print('Program [red_run_copy_command_schema] sucessfully finished', time.ctime())
 
 # red_run_copy_command(red_cursor,p_schema='gasquest2019', p_table='LocationOverrideCapacity',p_mode='execute')

@@ -30,15 +30,17 @@ conn_redshift=connect_to_red()
 
 
 
-v_Filter_Case="BA_Affiliates"
+
 v_Filter_Case=""
+v_Filter_Case="RFS_Notes"
+
 try:
 	v_filter_lowecase=v_Filter_Case.lower()
 except:
 	v_filter_lowecase = None
 
 v_schema="qptm_gs"
-step=5
+step=1
 
 print('FILTER:',v_filter_lowecase)
 
@@ -55,7 +57,7 @@ if step==1:
 
 #Step4:RUN REDSHIFT copy command
 if step==4:
-    red_run_copy_command_schema(conn_redshift=conn_redshift, p_mode='execute', p_schema=v_schema,p_filter=v_filter_lowecase)
+    red_run_copy_command_schema(conn_redshift=conn_redshift, p_mode='print', p_schema=v_schema,p_filter=v_filter_lowecase)
 
 
 if step==5: #VALIDATION
