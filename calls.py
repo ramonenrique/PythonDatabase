@@ -1,4 +1,4 @@
-from enterprise.credentials import *
+from enterprise.inv_credentials import *
 from enterprise.excel  import *
 from enterprise.db_generic  import *
 

@@ -1,5 +1,5 @@
 import pymssql
-from enterprise.credentials import *
+from enterprise.inv_credentials import *
 from enterprise.redshift_functions import *
 import os
 import time

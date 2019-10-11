@@ -1,7 +1,7 @@
-from enterprise.db_generic import *
-from enterprise.excel import *
-from enterprise.redshift_functions import  *
-from enterprise.mssql_functions import *
+from db_generic import *
+from excel import *
+from redshift_functions import  *
+from mssql_functions import *
 
 import time
 import numpy as np
@@ -320,13 +320,13 @@ def valid_main_schema_compare(conn_src,p_source_schema,conn_tgt,p_target_schema)
 
 	save_xls(dfoutput, 'valid_main_schema_compare')
 
-def valid_main_schema_rowcount_only(conn_src,p_source_schema,conn_tgt,p_target_schema,p_filter):
+def valid_main_schema_rowcount_only(conn_src,dic_src,conn_tgt,p_target_schema,p_filter):
 #Receives two db and schema, and it will compare the structure and summary data for all the tables
 #depending on the database type, it will get the lsit of tables, then call a comparison with the target schema
 
 	global dfoutput
 
-	df_tables=db_dataframe_all_tables(conn_src, p_source_schema)
+	df_tables=db_dataframe_all_tables(conn_src, dic_src.["mssql_schema"])
 	i=0
 
 	for t in df_tables.itertuples():

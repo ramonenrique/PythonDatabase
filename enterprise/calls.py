@@ -1,11 +1,11 @@
-from enterprise.credentials import *
-from enterprise.excel  import *
-from enterprise.db_generic  import *
+from credentials import *
+from excel  import *
+from db_generic  import *
 
-from enterprise.aurora_functions  import *
-from enterprise.mssql_functions  import *
-from enterprise.redshift_functions  import *
-from enterprise.validations import *
+from aurora_functions  import *
+from mssql_functions  import *
+from redshift_functions  import *
+from validations import *
 
 
 def call_bus_val_test1():
@@ -34,6 +34,9 @@ def call_bus_val_test1():
 conn_mssql=connect_to_mssql()
 conn_redshift=connect_to_red()
 print("DATABASE:",mssql_db)
+
+conn_aurora=connect_me_to_aurora()
+
 #mssql_create_export_views_flat(conn_mssql)
 
 
@@ -58,7 +61,7 @@ print("DATABASE:",mssql_db)
 # v_jsonqry=mssql_create_query_json(p_conn_mssql=conn_mssql,p_schema="dbo",p_table_name="ba_Credit")
 # print(v_jsonqry)
 #
-mssql_export_bcp_json(conn_mssql,p_src_schema="dbo", p_table="Billing_InvoiceDetail", p_mode='print', p_file_type='json')
+#mssql_export_bcp_json(conn_mssql,p_src_schema="dbo", p_table="Billing_InvoiceDetail", p_mode='print', p_file_type='json')
 
 #mssql_bcp_export_schema_json(p_conn_mssql=conn_mssql,p_schema="dbo",p_which_tables="pending",p_mode="print")
 
@@ -133,3 +136,16 @@ mssql_export_bcp_json(conn_mssql,p_src_schema="dbo", p_table="Billing_InvoiceDet
 #valid_main_schema_rowcount_only(conn_src=conn_mssql,p_source_schema='dbo',conn_tgt=conn_redshift,p_target_schema='qptm_gs',p_filter=None)
 
 #valid_main_schema_rowcount_only(conn_src=conn_mssql,p_source_schema='dbo',conn_tgt=conn_redshift,p_target_schema='qptm_gc',p_filter="Rates_")
+
+#mssql_bcp_export_schema_json(p_conn_mssql=conn_mssql, p_source_schema='dbo', p_target_schema="qptm_gs",	 p_which_tables="pending", p_mode="print")
+
+
+#def mssql_list_pending_migrate_case_proof(p_conn_mssql,p_source_schema,p_conn_red,p_target_schema):
+# pl=mssql_list_pending_migrate_case_proof(p_conn_mssql=conn_mssql,p_source_schema='dbo',p_conn_red=conn_redshift,p_target_schema='qptm_gs')
+# print(pl)
+
+
+lsch=db_list_all_schemas(conn_aurora)
+print(lsch)
+
+

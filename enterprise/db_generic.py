@@ -102,3 +102,21 @@ def db_dataframe_all_tables(p_conn, p_schema):
 		print('List of populated tables', ' ***ERROR***')
 		return (None)  ##empty list
 
+
+def db_list_all_schemas(p_conn):
+#THIS FUNCTION works for both redshift and microsoft sql, so placing it in the generic library too.
+
+	try:
+		v_sql_list_schema = " select distinct ist.table_schema as table_schema\
+								from  INFORMATION_SCHEMA.TABLES ist \
+								where ist.table_type = 'BASE TABLE' order by ist.table_name "
+
+		df_list_schema = pd.read_sql(v_sql_list_schema, con=p_conn)  # user svc_integration needs permissions to
+
+		print('List of all  tables in schema created', ' sucessfully', " length= ", len(df_list_schema))
+		list_schema = df_list_schema['table_schema'].values.tolist()
+		list_schema.sort()
+		return(list_schema)
+	except:
+		print('List of populated tables', ' ***ERROR***')
+		return (None)  ##empty list

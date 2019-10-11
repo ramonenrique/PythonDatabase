@@ -1,11 +1,11 @@
-from enterprise.credentials import *
-from enterprise.excel  import *
-from enterprise.db_generic  import *
+from credentials import *
+from excel  import *
+from db_generic  import *
 
-from enterprise.aurora_functions  import *
-from enterprise.mssql_functions  import *
-from enterprise.redshift_functions  import *
-from enterprise.validations import *
+from aurora_functions  import *
+from mssql_functions  import *
+from redshift_functions  import *
+from validations import *
 
 def call_bus_val_test1():
 	global conn_redshift
@@ -46,7 +46,9 @@ print('FILTER:',v_filter_lowecase)
 
 #Step1:export data using bcp
 if step==1:
-    mssql_bcp_export_schema_json(p_conn_mssql=conn_mssql,p_source_schema='dbo',p_target_schema=v_schema,p_which_tables="filter:"+v_Filter_Case,p_mode="execute")
+    #mssql_bcp_export_schema_json(p_conn_mssql=conn_mssql,p_source_schema='dbo',p_target_schema=v_schema,p_which_tables="filter:"+v_Filter_Case,p_mode="execute")
+	mssql_bcp_export_schema_json(p_conn_mssql=conn_mssql,p_source_schema='dbo',p_target_schema=v_schema,p_which_tables="pending",p_mode="print")
+
 
 #Step2:compress
 #path="C://temp//as_is_migration_large_tables//"
@@ -57,7 +59,7 @@ if step==1:
 
 #Step4:RUN REDSHIFT copy command
 if step==4:
-    red_run_copy_command_schema(conn_redshift=conn_redshift, p_mode='print', p_schema=v_schema,p_filter=v_filter_lowecase)
+    red_run_copy_command_schema(conn_redshift=conn_redshift, p_mode='print', p_schema=v_schema,p_filter="pending") #v_filter_lowecase)
 
 
 if step==5: #VALIDATION

@@ -2,11 +2,16 @@ import sysconfig
 import psycopg2
 import time
 
-from enterprise.db_generic import *
-from enterprise.credentials import *
+from db_generic import *
+#from credentials import *
 
 
-def connect_to_red():
+def connect_to_red_intentionally_break():
+    global db_lambda_port
+    global db_lambda_host
+    global db_windows_port
+    global db_windows_host
+
     if sysconfig.get_platform() == "win-amd64":
         redshift_host = db_windows_host
         redshift_port = db_windows_port
@@ -22,6 +27,24 @@ def connect_to_red():
         return (conn_redshift)
     except:
         print('Connection to redshift', ' ***ERROR***', time.ctime())
+
+def connect_to_red_param(var_target_host,var_target_port,var_target_username,var_target_password,var_target_database):
+
+    print( "Connecting to:")
+    print( "dbname=" + var_target_database)
+    print(" user=" + var_target_username)
+    print( " password=*********" )
+    print( " port=" + str(var_target_port))
+    print( " host=" + var_target_host )
+
+    try:
+        conn_redshift = psycopg2.connect( "dbname=" + var_target_database  + " user=" + var_target_username  + " password=" + var_target_password  + " port=" + str(var_target_port ) + " host=" + var_target_host )
+        conn_redshift.set_session(readonly=False, autocommit=True)
+        print('Connect_to_red_param:Connection to redshift:',' sucessfully created', time.ctime())
+        return (conn_redshift)
+    except:
+        print('Connect_to_red_param::Connection to redshift', ' ***ERROR***', time.ctime())
+        return None
 
 
 def red_list_pop_tables(p_conn_red,p_schema):
@@ -49,7 +72,7 @@ def red_list_all_tables(p_conn_red, p_schema):
                                 from information_schema.tables ist \
                                 where ist.table_schema in " + "(\'" + p_schema + "\')" + " and ist.table_type = 'BASE TABLE' "
 
-            print("this is the query:",v_sql_list_all)
+            print("Querying information schema (metadata) to get the list of tables:",v_sql_list_all)
             df_list_all = pd.read_sql(v_sql_list_all, con=p_conn_red)  # user svc_integration needs permissions to
 
             #print('List of all  tables in schema created', ' sucessfully', " length= ", len(df_list_all), time.ctime())
@@ -57,6 +80,7 @@ def red_list_all_tables(p_conn_red, p_schema):
             df1tolist=df1.tolist()
             df2tolist=df1.values.tolist()
 
+            print('def red_list_all_tables-Number of tables read:',len(df2tolist))
             return (df1tolist)
 
         except:
@@ -131,19 +155,37 @@ def red_run_copy_command(conn_redshift,p_schema, p_table,p_mode='print'):
     #NOTE:The calling environment must handle the commits since it is at connection level not cursor levl.
     #We are going to have multiple tables loaded, there is no need to commit for each one.
 
-def red_run_copy_command_schema(conn_redshift, p_mode='execute', p_schema='gasquest2019',p_filter=""):
+
+
+def red_run_copy_command_schema(cdict, p_mode='execute', p_filter="all"):
 #The parameter target_schema allows to change the target schema where the data is being loaded to.
 
-    list_tables = red_list_empty_tables(conn_redshift,p_schema)
-    list_tables = red_list_all_tables(conn_redshift,p_schema)
+    #template is  connect_to_red_param(var_target_host,var_target_port,var_target_username,var_target_password,var_target_database):
+    conn_redshift=connect_to_red_param(cdict['redshift_host'],cdict['redshift_port'],cdict['redshift_user'],cdict['redshift_password'],cdict['redshift_database'])
 
+    if p_filter=="pending":
+        list_tables = red_list_empty_tables(conn_redshift, cdict['redshift_schema'])
+    elif p_filter=="all":
+        list_tables = red_list_all_tables(conn_redshift,cdict['redshift_schema'])
+    elif len(p_filter)>2:
+        list_all = red_list_all_tables(conn_redshift, cdict['redshift_schema'])
+        list_tables=[]
+        for e in list_all:
+            if p_filter in e:
+                list_tables.append(e)
+    else:
+        print("Invalid option for filter")
+        list_tables = []
+
+    print('Getting ready to run redshift copy command for ', len(list_tables) , ' tables ')
     for x_table in list_tables:
-        if (p_filter in x_table  or p_filter == ""):  # if there is a filter then check
-            try:
-                red_run_copy_command(conn_redshift, p_schema.lower(),x_table.lower(), p_mode)
-            except:
-                print('Error loading from s3', x_table)
+        try:
+            red_run_copy_command(conn_redshift, cdict['redshift_schema'].lower(),x_table.lower(), p_mode)
+        except:
+            print('Error loading from s3', x_table)
+
     conn_redshift.commit()
     print('Program [red_run_copy_command_schema] sucessfully finished', time.ctime())
 
 # red_run_copy_command(red_cursor,p_schema='gasquest2019', p_table='LocationOverrideCapacity',p_mode='execute')
+

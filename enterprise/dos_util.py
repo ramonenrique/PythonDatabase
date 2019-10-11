@@ -50,6 +50,7 @@ def dos_compress_files(p_path_uncompressed):
     fullpath = '"' + exe_path + exe + '"'
     cmd='"' + fullpath +  '"' +  " -r -v -q --fast *.json "
 
+    print('debug:exe_path')
     os.chdir(p_path_uncompressed)
     print(cmd)
     os.system(cmd)

@@ -3,7 +3,7 @@ import psycopg2
 import time
 
 from enterprise.db_generic import *
-from enterprise.credentials import *
+from enterprise.inv_credentials import *
 
 
 def red_plug_me_in():
