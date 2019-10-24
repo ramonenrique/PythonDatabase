@@ -93,24 +93,30 @@ def valid2_rowcount(conn_src,p_source_schema,p_source_table,conn_tgt,p_target_sc
 	val_source_rowcount=-1
 	val_target_rowcount=-1
 
-	val_source_rowcount = db_get_row_count_in_db(conn_src, p_source_schema,p_source_table)
-	val_target_rowcount = db_get_row_count_in_db(conn_tgt, p_target_schema, p_target_table)
+	try:
+		val_source_rowcount = db_get_row_count_in_db(conn_src, p_source_schema,p_source_table)
+		val_target_rowcount = db_get_row_count_in_db(conn_tgt, p_target_schema, p_target_table)
 
-	if val_source_rowcount==val_target_rowcount and val_source_rowcount>=0:
-		v_result='passed'
-		v_comments='Number of rows verified:' + str(val_source_rowcount)
-	else:
-		v_result = '***FAILED***'
-		diff=val_source_rowcount -	val_target_rowcount
-		v_comments=f'Source:{str(val_source_rowcount)} Target:{str(val_target_rowcount)} - Diff:' + str(diff)
+		if val_source_rowcount==val_target_rowcount and val_source_rowcount>=0:
+			v_result='passed'
+			v_comments='Number of rows verified:' + str(val_source_rowcount)
+		elif val_source_rowcount==1:
+			print('I had trouble getting the rowcount for the SOURCE table')
+		elif val_target_rowcount == 1:
+			print('I had trouble getting the rowcount for the TARGET table')
+			v_result = '***FAILED***'
+			diff=val_source_rowcount -	val_target_rowcount
+			v_comments=f'Source:{str(val_source_rowcount)} Target:{str(val_target_rowcount)} - Diff:' + str(diff)
 
 
-	print(f'Validation Table {p_target_schema}.{p_target_table} {v_result} COMMENTS: {v_comments}',time.ctime())
-	#print('Attempting to add row to the log dataframe/xls')
-	dfoutput=add_log_row(df=dfoutput, p_table_name=p_source_table, p_column_name='TABLE-CHECK', p_validation='2-Table Rowcount', p_result=v_result, p_comments=v_comments, p_source_value=None, p_target_value=None, p_sqlstmt=None)
-	print('--------------------------------------------------------------------------------------------------')
-	return(v_result)
-
+		print(f'Validation Table {p_target_schema}.{p_target_table} {v_result} COMMENTS: {v_comments}',time.ctime())
+		#print('Attempting to add row to the log dataframe/xls')
+		dfoutput=add_log_row(df=dfoutput, p_table_name=p_source_table, p_column_name='TABLE-CHECK', p_validation='2-Table Rowcount', p_result=v_result, p_comments=v_comments, p_source_value=None, p_target_value=None, p_sqlstmt=None)
+		return(v_result)
+	except:
+		v_result='FAILED'
+		print(f'Validation Table {p_target_schema}.{p_target_table} {v_result} COMMENTS: UNEXPECTED ERROR, comparison not finished',time.ctime())
+		return('***FAILED***')
 
 def valid_col_prepare_sql(p_dbtype,p_sch_table_name,p_column_name,p_data_type):
 	#Need to customize because the language and functions is different across platforms.
@@ -312,7 +318,7 @@ def valid_main_schema_compare(conn_src,p_source_schema,conn_tgt,p_target_schema)
 
 	for t in df_tables.itertuples():
 		v_table_name=t.table_name.lower()
-		print('Processing Table',str(i), v_table_name)
+		#print('DEBUG-Processing Table',str(i), v_table_name)
 		# valid1_table_structure(conn_src, p_source_schema, t.table_name, conn_tgt, p_target_schema, t.table_name, p_default_rows=100)
 		# valid2_rowcount(conn_src,p_source_schema,v_table_name,conn_tgt,p_target_schema,p_target_table=v_table_name)
 		valid3_table_for_loop_cols(conn_src, p_source_schema, p_source_table=v_table_name, conn_tgt=conn_tgt, p_target_schema=p_target_schema,p_target_table=v_table_name)
@@ -324,9 +330,10 @@ def valid_main_schema_rowcount_only(conn_src,dic_src,conn_tgt,p_target_schema,p_
 #Receives two db and schema, and it will compare the structure and summary data for all the tables
 #depending on the database type, it will get the lsit of tables, then call a comparison with the target schema
 
+	print(f'function valid_main_schema_rowcount_only p_filter={p_filter}')
 	global dfoutput
 
-	df_tables=db_dataframe_all_tables(conn_src, dic_src.["mssql_schema"])
+	df_tables=db_dataframe_all_tables(conn_src, dic_src["mssql_schema"])
 	i=0
 
 	for t in df_tables.itertuples():
@@ -334,14 +341,16 @@ def valid_main_schema_rowcount_only(conn_src,dic_src,conn_tgt,p_target_schema,p_
 		v_table_case=t.table_name
 		#Penging handle the case where p_filter is none properly. too many ifs NOW.
 
-		if p_filter==None: v_action='process'
-		elif p_filter in (v_table_case): v_action='process'
-		else: v_action='skip'
+		if p_filter=="all" or p_filter in (v_table_case):
+			v_action='processing'
+			#print('DEBUG-Parameters passed to valid2_rowcount:',dic_src["mssql_schema"], '--',v_table_case, '--',conn_tgt, p_target_schema,'--', v_table_red)
+			valid2_rowcount(conn_src,dic_src["mssql_schema"],v_table_case,conn_tgt,p_target_schema,p_target_table=v_table_red)
+		else:
+			#print('DEBUG-Table does not match filter:')
+			v_action='skipping'
 
-		if v_action=='process':
-			print('Processing Table', str(i), v_table_case)
-			valid2_rowcount(conn_src,p_source_schema,v_table_case,conn_tgt,p_target_schema,p_target_table=v_table_red)
 		i=i+1
+		print('DEBUG-Table #',str(i), v_action, ' Table: ',v_table_case)
 
 	save_xls(dfoutput, 'valid_main_schema_rowcount_compare')
 

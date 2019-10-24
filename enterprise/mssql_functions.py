@@ -22,9 +22,9 @@ def connect_to_mssql_param(mssql_server,mssql_user,mssql_password,mssql_db,mssql
         return (conn_mssql)
     except:
         print('connect_to_mssql_param::Connection to MSSQL:', ' ***ERROR***', time.ctime())
-        return None
+        return -1
 
-def connect_to_mssql_dic(mdic):
+def connect_to_mssql_dict(mdic):
 
     try:
         conn_mssql = pymssql.connect(server=mdic['mssql_server'], user=mdic['mssql_user'], password=mdic['mssql_password'], database=mdic['mssql_database'],
@@ -33,7 +33,7 @@ def connect_to_mssql_dic(mdic):
         return (conn_mssql)
     except:
         print('connect_to_mssql_param::Connection to MSSQL:', ' ***ERROR***', time.ctime())
-        return None
+        return -1
 
 
 
@@ -74,8 +74,6 @@ def mssql_create_query_json(p_conn_mssql,p_schema,p_table_name):
         v_lc_str=v_lc_str+ "," + (x)
 
     v_lc_str=v_lc_str[1:5000] #remove the first comma
-
-    #print('lcstr v_lc_str:',v_lc_str)
 
     v_sql_create_qry = f"SELECT (select  {v_lc_str}  for json path, without_array_wrapper) col_json  from  {p_schema}.{p_table_name}"
 
@@ -128,130 +126,104 @@ def mssql_export_bcp_json_global_var(p_conn_mssql,p_src_schema, p_table, p_mode=
         try:
             print("Attempting to export data for", p_table) #adds too much noise:,"command=",v_dos_mssql_bcp_command)
             os.chdir(path)
-            print("Directory set to:", os.getcwd())
+            #print("DEBUG:Directory set to:", os.getcwd())
             os.system(v_dos_mssql_bcp_command)
             #print('Program [mssql_export_bcp_json sucessfully finished TABLE:',p_table, time.ctime())
         except:
             print('Program [mssql_export_bcp_json:**Error** executing bcp command')
     return (v_dos_mssql_bcp_command)
 
-def mssql_export_bcp_json(p_conn_mssql,p_mssql_conn_dict,p_src_schema, p_table, p_mode='print', p_file_type='json',p_check_exists=1):
-    # needed when prefix dbo in table bamev_table_name_mssql = p_table_with_schema[4:] #eliminates the 3 charts that say dbo
+def mssql_export_bcp_json(p_conn_mssql,p_mssql_conn_dict,p_src_schema, p_table, p_mode, p_exe_path,p_output_folder):
 
-    v_source_object_name = p_src_schema + p_table
-    # try:
-    #     v_rowcount_redshift=get_row_count_in_db(conn_redshift,p_table_with_schema)
-    #     if v_rowcount_redshift>=0:'Keep walking'
-    # except:
-    #     print('This table does not exist in the target - create it or insert data so I can compare')
-    #
-    #  -C 65001" means UTF8 standard (sets the date in a format that redshift understands)
-    #This program was using schema/table before, now just using json qjery[p_src_schema].[p_prefix][p_table]=json now
-
-    print("debug mssql_export_bcp_json READING dictionary and assigning variables ")
+    #print('debug mssql_export_bcp_json READING dictionary and assigning variables ")
     mssql_server=p_mssql_conn_dict["mssql_server"]
     mssql_user = p_mssql_conn_dict["mssql_user"]
-    mssql_db = p_mssql_conn_dict["mssql_db"]
+    mssql_database = p_mssql_conn_dict["mssql_database"]
     mssql_port = p_mssql_conn_dict["mssql_port"]
     mssql_password = p_mssql_conn_dict["mssql_password"]
 
-    v_jsonqry=mssql_create_query_json(p_conn_mssql=p_conn_mssql,p_schema=p_src_schema,p_table_name=p_table)
-    #print('vjsonquery:',v_jsonqry)
+    ##print('debug ONLY:',p_mssql_conn_dict)
 
-    print("debug:preparing bcp command")
-    v_file_name=p_table + "." + p_file_type
+    try:
+        v_jsonqry=mssql_create_query_json(p_conn_mssql=p_conn_mssql,p_schema=p_src_schema,p_table_name=p_table)
+    except:
+        print('There was an error preparing the json query for: {p_src_schema}.{p_table}')
+        return(-1)
+
+    #print('debug:preparing bcp command")
+    v_file_name=p_table + ".json"
     v_file_name=v_file_name.lower()
 
-    v_dos_mssql_bcp_command = "bcp  $v_jsonqry$  queryout  $C:*temp*file_name$  -S mssql_server,mssql_port -U mssql_user -P mssql_password -d mssql_db -c -C 65001"
-    v_dos_mssql_bcp_command = v_dos_mssql_bcp_command.replace("*", '//')
-    v_dos_mssql_bcp_command = v_dos_mssql_bcp_command.replace("$", '"')
-    v_dos_mssql_bcp_command = v_dos_mssql_bcp_command.replace("file_name",v_file_name ) ##file names ideally lowecase
+    #important note: do not use back slash because THE DOS COMAND WILL ERROR OUT
 
-    v_dos_mssql_bcp_command = v_dos_mssql_bcp_command.replace("v_jsonqry", v_jsonqry)
-    v_dos_mssql_bcp_command = v_dos_mssql_bcp_command.replace("mssql_server", mssql_server)
-    v_dos_mssql_bcp_command = v_dos_mssql_bcp_command.replace("mssql_user", mssql_user)
-    v_dos_mssql_bcp_command = v_dos_mssql_bcp_command.replace("mssql_db", mssql_db)
-    v_dos_mssql_bcp_command = v_dos_mssql_bcp_command.replace("mssql_port", mssql_port)
-    v_dos_mssql_bcp_command = v_dos_mssql_bcp_command.replace("mssql_password", mssql_password)
+    v_folder_path=f"{p_output_folder}/{mssql_database}"
+    v_full_path=f"{v_folder_path}/{p_table}.json"
 
-    path = "C://Program Files//Microsoft SQL Server//Client SDK//ODBC//130//Tools//Binn//" #make sure to use forward slash
-    program = "bcp.exe"
-    fullpath = '"' + path + program + '"'
+    v_dos_mssql_bcp_command_new = f"bcp  *{v_jsonqry}*  queryout  *{v_full_path}*  -S  {mssql_server},{mssql_port} -U {mssql_user} -P {mssql_password} -d {mssql_database} -c -C 65001"
+    v_dos_mssql_bcp_command_new =v_dos_mssql_bcp_command_new.replace("*",'"') #the jsonquery and the path must be in double quotes to execute well in dos
 
-    print("debug: Before executing bcp command")
+    #this is coming from screen v_exe_path = "C://Program Files//Microsoft SQL Server//Client SDK//ODBC//130//Tools//Binn//" #make sure to use forward slash
+
+    #print('debug: Before executing bcp command")
     if p_mode == 'print':
-        print(v_dos_mssql_bcp_command)
+        print('BCP COMMAND:',v_dos_mssql_bcp_command_new)
     elif p_mode == 'execute':
         try:
-            print("Attempting to export data for", p_table) #adds too much noise:,"command=",v_dos_mssql_bcp_command)
-            os.chdir(path)
-            print("Directory set to:", os.getcwd())
-            os.system(v_dos_mssql_bcp_command)
-            #print('Program [mssql_export_bcp_json sucessfully finished TABLE:',p_table, time.ctime())
+            #For execution, needs to replace the single forward slash for DOUBLE, this is the way Python os library needs it.
+            v_cmd_dos=v_dos_mssql_bcp_command_new.replace("\\", "/")
+            v_exe_path_dos=p_exe_path.replace("\\", "/")
+            #print('debug-Attempting to export data for", p_table) #adds too much noise:,"command=",v_dos_mssql_bcp_command)
+            #print('debug-Go to where the exe is:", os.getcwd())
+            os.chdir(v_exe_path_dos)
+            os.system(v_cmd_dos)
+            print('mssql_export_bcp_json:Program [mssql_export_bcp_json sucessfully finished TABLE:',p_table, time.ctime())
+            return(1)
+        except OSError as err:
+            v_err="OS error: {0}".format(err)
+            print(v_err)
+            raise
         except:
-            print('Program [mssql_export_bcp_json:**Error** executing bcp command')
-    return (v_dos_mssql_bcp_command)
-
-def run_bcp(p_test=1):
-    path = "C://Program Files//Microsoft SQL Server//Client SDK//ODBC//130//Tools//Binn//"
-    program = "bcp.exe"
-    fullpath = '"' + path + program + '"'
-
-    if p_test==1:
-        print(fullpath)
-        os.system(fullpath)
-
-    if p_test==2:
-        print("path 1:", os.getcwd())
-        os.chdir(path)
-        print("path 2:",os.getcwd())
-        os.system(program)
+            raise
 
 
+def mssql_list_tables_to_export(p_conn_mssql,v_source_schema,p_conn_redshift,p_target_schema,p_filter):
 
-def mssql_bcp_export_schema_json(p_conn_mssql,p_mssql_conn_dict,p_source_schema,p_conn_redshift,p_target_schema,p_which_tables="all",p_mode="execute"):
+    if p_filter=='all':
+        list_tables=db_list_all_tables(p_conn=p_conn_mssql, p_schema=v_source_schema)
+    elif p_filter=='pending':
+         list_tables = mssql_list_pending_migrate_case_proof(p_conn_mssql=p_conn_mssql, p_source_schema=v_source_schema, p_conn_red=p_conn_redshift, p_target_schema=p_target_schema)
+    elif len(p_filter)>2:
+        list_tables=mssql_list_filter_tables(p_conn_mssql, v_source_schema,p_filter)
+    else:
+        print("invalid mode, please specify valid values [all,pending,filter]")
+
+    return(list_tables)
+
+
+def mssql_bcp_export_schema_json(p_conn_mssql,p_mssql_conn_dict,p_list_tables,p_mode="execute",p_exe_path="unknown",p_output_folder="c://temp"):
     #p_conn_redshift,p_target_schema :these parameters are only needed if you want to check the list of tables across
     #another alternative is to send a parameter with the list of tables to process
 
-    mssql_db=p_mssql_conn_dict["mssql_db"]
+    print("mssql_bcp_export_schema_json: # of tables to export:",str(len(p_list_tables)))
+    #First step is making sure the results are saved withing a subfolder for that database, since we are managing multiple
+    #databses, especially for quantium we have two sets of tables
+    
+    # For execution, needs to replace the single forward slash for DOUBLE, this is the way Python os library needs it.
+    v_folder_path = p_output_folder.replace("\\", "/")
+    v_database=p_mssql_conn_dict["mssql_database"]
+    
+    try:
+        os.chdir(p_output_folder)
+        os.system(f"mkdir {v_database}")
+        print('Folder for database created successfully',v_database,'  in' , p_output_folder)
+    except:
+        print('mssql_bcp_export_schema_json:***ERROR*** - Folder does not exist, please create it',p_output_folder)
+        return(-1)
 
-    print(f'Exporting for DATABASE:{mssql_db} -SOURCE: {p_source_schema}  TARGET:{p_target_schema} ')
-    list_tables =[]
+    for x_table in p_list_tables:
+        mssql_export_bcp_json(p_conn_mssql,p_mssql_conn_dict,p_mssql_conn_dict["mssql_schema"], x_table, p_mode, p_exe_path,p_output_folder)
 
-    if p_which_tables=='all':
-        list_tables=db_list_all_tables(p_conn=p_conn_mssql, p_schema=p_source_schema)
-    elif p_which_tables=='pending':
-        #pending_adapt_parameters
-        #pending conn_redshift = connect_to_red() #Needs a connection to redshift because this function goes across
-        list_tables = mssql_list_pending_migrate_case_proof(p_conn_mssql=p_conn_mssql, p_source_schema=p_source_schema, p_conn_red=p_conn_redshift, p_target_schema=p_target_schema)
-    elif p_which_tables[0:6]=="filter":
-         v_filter=p_which_tables[8:40]
-         list_tables=mssql_list_filter_tables(p_conn_mssql, p_source_schema,v_filter)
-    else:
-        print("invalid mode, please specify all or pending in target")
-
-    print("I am about to export this many tables:",list_tables.__len__())
-
-    for x_table in list_tables:
-        print('debug:inside for x table in list_tables:mssql_export_bcp_json')
-        mssql_export_bcp_json(p_conn_mssql=p_conn_mssql,p_mssql_conn_dict=p_mssql_conn_dict,p_src_schema=p_source_schema, p_table=x_table, p_mode=p_mode, p_file_type='json')
-
-
-# def print_bcp_all(p_mode='print'):
-#     list_pending_tables = red_list_empty_tables()
-#     list_pending_tables.sort()
-#
-#     # for x_table in list_pending_tables:
-#     #     try:
-#     #         export_mssql_bcp(p_table=x_table, p_src_schema="SlalomMapping", p_prefix="v_export_", p_mode='print')
-#     #         #temp_rename(x_table)
-#     #     except:
-#     #         print(sys.exc_info()[0])
-#     #         print('Error exporting',x_table)
-#
-#     for x_table in list_pending_tables:
-#         mssql_export_bcp_json(p_table=x_table, p_src_schema="SlalomMapping", p_mode=p_mode)
-#
+    return(1) #indicates success
 
 
 def mssql_list_empty_tables(p_conn_mssql,p_schema):
@@ -267,12 +239,10 @@ def mssql_list_empty_tables(p_conn_mssql,p_schema):
                         and schema_name(schema_id  )='dbo' \
                         order by t.name,s.row_count "
 
-    #v_metadata_mssql = v_metadata_mssql.replace("*","'")
-    #v_metadata_mssql = v_metadata_mssql.replace("dbo","p_target_schema")
-
     df_list_zero = pd.read_sql(v_metadata_mssql, con=p_conn_mssql)
-    print('length list zero:',len(df_list_zero))
+    #print('DEBUG:length list zero:',len(df_list_zero))
     return(df_list_zero['table_name'].tolist())
+
 
 def mssql_list_filter_tables(p_conn_mssql,p_schema,p_like_filter):
 
@@ -289,8 +259,9 @@ def mssql_list_filter_tables(p_conn_mssql,p_schema,p_like_filter):
     return(df_tables['TABLE_NAME'].tolist())
 
 
-
 def mssql_create_all_export_views_flat_file(conn_mssql,p_target_schema):
+#this function is no longer used since we are sending the json qry with the bcp but it could be very useful
+#in the future
 
     v_metadata_mssql=" select DISTINCT table_name \
                         from INFORMATION_SCHEMA.TABLES \

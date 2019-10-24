@@ -45,14 +45,13 @@ def dos_rename_lowercase(mylist):
 
 def dos_compress_files(p_path_uncompressed):
 
-    exe_path = "C://Program Files (x86)//GnuWin32//bin//"
-    exe = "gzip.exe"
-    fullpath = '"' + exe_path + exe + '"'
-    cmd='"' + fullpath +  '"' +  " -r -v -q --fast *.json "
+    v_os_path=p_path_uncompressed.replace('\\','/')# ptyhon needs to use forward slash to call dos
 
-    print('debug:exe_path')
-    os.chdir(p_path_uncompressed)
-    print(cmd)
+    exe_path = "C://Program Files (x86)//GnuWin32//bin//gzip.exe"
+    fullpath = '"' + exe_path + '"'
+    cmd=fullpath +  " -r -v -q --fast *.json "
+
+    print(f'debug:dos_compress_files comand is:',cmd)
+    os.chdir(v_os_path)
     os.system(cmd)
-
-
+    return(1)

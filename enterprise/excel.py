@@ -17,6 +17,7 @@ def save_xls(df,p_file_name):
 	with pd.ExcelWriter(f, engine='xlsxwriter') as writer:  # doctest: +SKIP
 		df.to_excel(writer, sheet_name='validation')
 		writer.save()         # Close the Pandas Excel writer and output the Excel file.
+	print('Saved excel file to disk:',p_file_name)
 
 def add_log_row(df,p_table_name,p_column_name,p_validation,p_result,p_comments,p_source_value,p_target_value,p_sqlstmt):
 	#dict1 = {'table': p_table_name, 'column': p_column_name, 'validation':p_validation, 'sqlstmt':p_sqlstmt,'result': p_result, 'comments':p_comments,'source_value':p_source_value,'target_value':p_target_value}

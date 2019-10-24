@@ -20,20 +20,22 @@ def db_database_type(conn):
 
 
 def db_get_row_count_in_db(conn1,p_schema,p_table):
-    # AUTHOR: RAMON SALAZAR
-    #    DATE: 2019-07-10
-    # Submit a query to the database rather than doing it in PANDAS.
-    #Meant for large/huge tables.
+	# AUTHOR: RAMON SALAZAR
+	#    DATE: 2019-07-10
+	# Submit a query to the database rather than doing it in PANDAS.
+	# #Meant for large/huge tables.
 
-    v_sqlcount = 'SELECT count(*) from ' + p_schema + "." + p_table
-
-    #print('SQL STAMEMENT FOR COUNT',v_sqlcount)
-    cur = conn1.cursor()
-    cur.execute(v_sqlcount)
-    rec=cur.fetchone()
-    val_rowcount=rec[0]
-    cur.close()
-    return val_rowcount
+	try:
+		v_sqlcount = f'SELECT count(*) from {p_schema}.{p_table} '
+		cur = conn1.cursor()
+		cur.execute(v_sqlcount)
+		rec = cur.fetchone()
+		val_rowcount = rec[0]
+		cur.close()
+		return(val_rowcount)
+	except:
+		print('db_get_row_count_in_db',' there was a problem getting the rowcount for this table',v_sqlcount)
+		return(-1)
 
 
 
