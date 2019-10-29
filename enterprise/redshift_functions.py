@@ -4,6 +4,11 @@ import time
 
 from db_generic import *
 #from credentials import *
+import os,sys
+
+#Custom libraries
+from error_management import *
+from redshift_functions import *
 
 
 def copy_config_defaults():
@@ -36,7 +41,8 @@ def connect_to_red_intentionally_break():
         return (conn_redshift)
     except:
         print('Connection to redshift', ' ***ERROR***', time.ctime())
-        return(-1)
+        #return(-1)
+        exception_handler()
 
 def connect_to_red_param(var_target_host,var_target_port,var_target_username,var_target_password,var_target_database):
 
@@ -65,7 +71,7 @@ def connect_to_red_dict(rdict):
         return (conn_redshift)
     except:
         print('Connect_to_red_param::Connection to redshift', ' ***ERROR***', time.ctime())
-        return -1
+        exception_handler() #return -1
 
 def red_list_pop_tables(p_conn_red,p_schema):
 
@@ -82,7 +88,7 @@ def red_list_pop_tables(p_conn_red,p_schema):
         return(df_list_pop['table_name'].values.tolist()) #converts from dataframe to list
     except:
         print('List of populated tables', ' ***ERROR***', time.ctime())
-        return(-1) ##empty list
+        exception_handler() #return(-1) ##empty list
 
 def red_list_all_tables(p_conn_red, p_schema):
 
@@ -107,7 +113,7 @@ def red_list_all_tables(p_conn_red, p_schema):
 
         except:
             print('List of populated tables', ' ***ERROR***', time.ctime())
-            return (None)  ##empty list
+            exception_handler() #return (None)  ##empty list
 
 
 def red_list_filter_tables(p_conn_red, p_schema,p_filter):
@@ -125,32 +131,34 @@ def red_list_filter_tables(p_conn_red, p_schema,p_filter):
         return (df1tolist)
     except:
         print('red_list_filter_tables', ' ***ERROR***', time.ctime())
-        return (-1)  ##empty list
+        exception_handler() #return (-1)  ##empty list
 
 
-def  red_list_empty_tables(p_cr, p_schema):
+def red_list_empty_tables(p_cr, p_schema):
 
-    #worked outside x = red_list_all_tables(p_conn_red=conn_redshift, p_schema="qptm_gc")
-    list_all = red_list_all_tables(p_conn_red=p_cr,p_schema=p_schema)
-    # print("length list all tables in schema:",len(list_all))
+    try:
+        #worked outside x = red_list_all_tables(p_conn_red=conn_redshift, p_schema="qptm_gc")
+        list_all = red_list_all_tables(p_conn_red=p_cr,p_schema=p_schema)
+        # print("length list all tables in schema:",len(list_all))
 
-    list_pop = red_list_pop_tables(p_conn_red=p_cr,p_schema=p_schema)
-    # print("length list populated:",len(list_pop))
+        list_pop = red_list_pop_tables(p_conn_red=p_cr,p_schema=p_schema)
+        # print("length list populated:",len(list_pop))
 
-    #--list1-list2 gives me all the tables that need to be exported
+        #--list1-list2 gives me all the tables that need to be exported
 
-    if type(list_all) != type(None) and  type(list_pop) != type(None):
+        if type(list_all) != type(None) and  type(list_pop) != type(None):
 
-        list_pending=(list(set(list_all) - set(list_pop)))
-        list_pending.sort() #sorts the list in alphatbetical order
+            list_pending=(list(set(list_all) - set(list_pop)))
+            list_pending.sort() #sorts the list in alphatbetical order
 
-        print('Number of all tables:',len(list_all))
-        print('Number of popualted:',len(list_pop))
-        print('Number of pending tables (RESULT):',len(list_pending))
-    else:
-        return(-1)
-    return(list_pending)
-
+            print('Number of all tables:',len(list_all))
+            print('Number of popualted:',len(list_pop))
+            print('Number of pending tables (RESULT):',len(list_pending))
+        else:
+            return(-1)
+        return(list_pending)
+    except:
+        exception_handler()
 
 def red_print_sql_empty_count(list_tables):
     #This only generates SQL to be later plugged into a client to get the roucount for empty tables
@@ -160,7 +168,7 @@ def red_print_sql_empty_count(list_tables):
             print(v_stmt.replace('x_table',x_table))
 
 
-def red_run_copy_command(p_conn_redshift, p_schema,p_table,p_ccc,p_run_mode='execute'):
+def red_run_copy_command(p_conn_redshift, p_schema,p_table,p_ccc,p_run_mode='execute',p_output_folder='c:\temp'):
 
     #needed when prefix dbo in table bamev_table_name_mssql = p_table_with_schema[4:] #eliminates the 3 charts that say dbo
     #The file being exported only has the table name in the file name.
@@ -172,46 +180,56 @@ def red_run_copy_command(p_conn_redshift, p_schema,p_table,p_ccc,p_run_mode='exe
 
     #The default iam_role is 'arn:aws:iam::599920608012:role/role-redshift-bwp-gms-data-dev'
     # print(f'Function red_run_copy_command p_run_mode={p_run_mode}')
-    p_s3_bucket=p_ccc["s3_bucket"]
-    p_iam_role=p_ccc["iam_role"]
-    p_options=p_ccc["options"]
+    try:
+        p_s3_bucket=p_ccc["s3_bucket"]
+        p_iam_role=p_ccc["iam_role"]
+        p_options=p_ccc["options"]
 
-    #print('Connection:',p_conn_redshift,'--schema:', p_schema,'--table:',p_table,'--s3 bucket:',p_s3_bucket,'--IAM role:',p_iam_role,'--CMD OPTIONS:',p_options,'--RUN MODE:',p_run_mode)
+        #print('Connection:',p_conn_redshift,'--schema:', p_schema,'--table:',p_table,'--s3 bucket:',p_s3_bucket,'--IAM role:',p_iam_role,'--CMD OPTIONS:',p_options,'--RUN MODE:',p_run_mode)
 
-    v_table=p_table.lower() #Tables in redshift are in lowercase, file name and table name should be in lowercase.
+        v_table=p_table.lower() #Tables in redshift are in lowercase, file name and table name should be in lowercase.
 
-    v_full_s3_path=f'{p_s3_bucket}/{p_schema}/{p_table}.json.gz'
-    v_full_s3_path_quotes="'" + v_full_s3_path + "'"
-    v_full_file_path_quotes = "'" + v_full_s3_path + "'"
-    v_iam_role_quotes="'" + p_iam_role + "'"
+        v_full_s3_path=f'{p_s3_bucket}/{p_schema}/{p_table}.json.gz'
+        v_full_s3_path_quotes="'" + v_full_s3_path + "'"
+        v_full_file_path_quotes = "'" + v_full_s3_path + "'"
+        v_iam_role_quotes="'" + p_iam_role + "'"
 
-    v_redshift_command=  f'copy  {p_schema}.{p_table}  from {v_full_s3_path_quotes} iam_role {v_iam_role_quotes} {p_options}'
+        v_redshift_command=  f'copy  {p_schema}.{p_table}  from {v_full_s3_path_quotes} iam_role {v_iam_role_quotes} {p_options}'
 
-    if p_run_mode == 'print':
-        print(v_redshift_command)
-    elif p_run_mode=='execute':
-       # print('Execute mode')
-        v_rowcount_redshift = db_get_row_count_in_db(p_conn_redshift, p_schema=p_schema, p_table=p_table)
+        if p_run_mode == 'print':
+                v_print_file_path = f'{p_output_folder}\\redshift_copy_command.txt'
+                sourceFile = open(v_print_file_path, 'a+')
+                print(f'REM {time.ctime()}Run this command in Redshift session to import table:{p_table}', file=sourceFile)
+                print(v_redshift_command, file=sourceFile)
+                print('\n \n', file=sourceFile)
+                print('Redshift command written to file:', v_print_file_path)
+                sourceFile.close()
 
-        cur = p_conn_redshift.cursor()
-        if v_rowcount_redshift > 0:
-            print('Data already exists in the table:',p_table, 'Truncating table first')
-            cur.execute(f'truncate table {p_schema}.{p_table}')
+        elif p_run_mode=='execute':
+           # print('Execute mode')
+            v_rowcount_redshift = db_get_row_count_in_db(p_conn_redshift, p_schema=p_schema, p_table=p_table)
 
-        #TEMPLATE FOR COPY COMMAND  ="copy    p_schema.p_table    from  \'s3://bwp-gms-mikedey-special-chars/AsIsMigration/Redshift/p_schema/p_table.txt.gz\'  iam_role \'arn:aws:iam::599920608012:role/role-redshift-bwp-gms-data-dev\'  gzip  json 'auto' "
-        cur.execute(v_redshift_command)
-        v_rowcount_redshift_now=db_get_row_count_in_db(p_conn_redshift,p_schema=p_schema, p_table=v_table) #run again but now AFTER the statement has been executed
-        print(f'Program [red_run_copy_command] successfully loaded {p_schema}.{p_table} Rowcount is {v_rowcount_redshift_now}', time.ctime())
-        #it will print the command in all cases (print only mode and execute mode
-        cur.close()
-    else:
-        print('red_run_copy_command:invalid mode. Accepted values are print/execute')
-    #NOTE:The calling environment must handle the commits since it is at connection level not cursor levl.
-    #We are going to have multiple tables loaded, there is no need to commit for each one.
+            cur = p_conn_redshift.cursor()
+            if v_rowcount_redshift > 0:
+                print('Data already exists in the table:',p_table, 'Truncating table first')
+                cur.execute(f'truncate table {p_schema}.{p_table}')
+
+            #TEMPLATE FOR COPY COMMAND  ="copy    p_schema.p_table    from  \'s3://bwp-gms-mikedey-special-chars/AsIsMigration/Redshift/p_schema/p_table.txt.gz\'  iam_role \'arn:aws:iam::599920608012:role/role-redshift-bwp-gms-data-dev\'  gzip  json 'auto' "
+            cur.execute(v_redshift_command)
+            v_rowcount_redshift_now=db_get_row_count_in_db(p_conn_redshift,p_schema=p_schema, p_table=v_table) #run again but now AFTER the statement has been executed
+            print(f'Program [red_run_copy_command] successfully loaded {p_schema}.{p_table} Rowcount is {v_rowcount_redshift_now}', time.ctime())
+            #it will print the command in all cases (print only mode and execute mode
+            cur.close()
+        else:
+            print('red_run_copy_command:invalid mode. Accepted values are print/execute')
+        #NOTE:The calling environment must handle the commits since it is at connection level not cursor levl.
+        #We are going to have multiple tables loaded, there is no need to commit for each one.
+    except:
+        exception_handler()
 
 
 
-def red_run_copy_command_schema(cdict, copy_cmd_cfg,p_run_mode='execute', p_filter="all"):
+def red_run_copy_command_schema(cdict, copy_cmd_cfg,p_run_mode='execute', p_filter="all",p_output_folder='c:\temp'):
 #The parameter target_schema allows to change the target schema where the data is being loaded to.
 
     #template is  connect_to_red_param(var_target_host,var_target_port,var_target_username,var_target_password,var_target_database):
@@ -219,31 +237,35 @@ def red_run_copy_command_schema(cdict, copy_cmd_cfg,p_run_mode='execute', p_filt
     #print(f'DEBUG:Dictionarty with all properties: copy_cmd_cfg {copy_cmd_cfg}' )
 
 
-    v_schema = cdict['redshift_schema'].lower()
-    conn_redshift=connect_to_red_param(cdict['redshift_host'],cdict['redshift_port'],cdict['redshift_user'],cdict['redshift_password'],cdict['redshift_database'])
+    try:
+        v_schema = cdict['redshift_schema'].lower()
+        conn_redshift=connect_to_red_param(cdict['redshift_host'],cdict['redshift_port'],cdict['redshift_user'],cdict['redshift_password'],cdict['redshift_database'])
 
-    if p_filter=="pending":
-        list_tables = red_list_empty_tables(conn_redshift, v_schema)
-    elif p_filter=="all":
-        list_tables = red_list_all_tables(conn_redshift,v_schema)
-    elif len(p_filter)>2:
-        #print('DEBUG:red_run_copy_command_schema:red_run_copy_command_schema:trying to filter list of tables:',p_filter)
-        list_tables = red_list_filter_tables(conn_redshift, v_schema,p_filter)
-    else:
-        print("Invalid option for filter")
-        list_tables = []
+        if p_filter=="pending":
+            list_tables = red_list_empty_tables(conn_redshift, v_schema)
+        elif p_filter=="all":
+            list_tables = red_list_all_tables(conn_redshift,v_schema)
+        elif len(p_filter)>2:
+            #print('DEBUG:red_run_copy_command_schema:red_run_copy_command_schema:trying to filter list of tables:',p_filter)
+            list_tables = red_list_filter_tables(conn_redshift, v_schema,p_filter)
+        else:
+            print("Invalid option for filter")
+            list_tables = []
 
-    if list_tables!=-1:
-        print('red_run_copy_command_schema:Getting ready to run redshift copy command for ', len(list_tables) , ' tables ')
-        for x_table in list_tables:
-           # try:
-            red_run_copy_command(p_conn_redshift=conn_redshift, p_schema=v_schema,p_table=x_table,p_ccc=copy_cmd_cfg,p_run_mode=p_run_mode)
-    else:
-        print('red_run_copy_command_schema/call list_tables_functins:Error calculating the list of tables')
+        if list_tables!=-1:
+            print('red_run_copy_command_schema:Getting ready to run redshift copy command for ', len(list_tables) , ' tables ')
+            for x_table in list_tables:
+               # try:
+                red_run_copy_command(p_conn_redshift=conn_redshift, p_schema=v_schema,p_table=x_table,p_ccc=copy_cmd_cfg,p_run_mode=p_run_mode,p_output_folder=p_output_folder)
+        else:
+            print('red_run_copy_command_schema/call list_tables_functins:Error calculating the list of tables')
 
 
-    conn_redshift.commit()
-    print('Program [red_run_copy_command_schema] sucessfully finished', time.ctime())
+        conn_redshift.commit()
+        print('Program [red_run_copy_command_schema] sucessfully finished', time.ctime())
+
+    except:
+        exception_handler()
 
 # red_run_copy_command(red_cursor,p_schema='gasquest2019', p_table='LocationOverrideCapacity',p_mode='execute')
 

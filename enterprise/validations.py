@@ -307,7 +307,7 @@ def valid3_table_for_loop_cols(conn_src,p_source_schema,p_source_table,conn_tgt,
 			val_col_compare(conn_src,v_src_sch_table,row.column_name, row.data_type,conn_tgt,v_tgt_sch_table)
 
 
-def valid_main_schema_compare(conn_src,p_source_schema,conn_tgt,p_target_schema):
+def valid_main_schema_compare(conn_src,p_source_schema,conn_tgt,p_target_schema,p_output_folder):
 #Receives two db and schema, and it will compare the structure and summary data for all the tables
 #depending on the database type, it will get the lsit of tables, then call a comparison with the target schema
 
@@ -324,9 +324,13 @@ def valid_main_schema_compare(conn_src,p_source_schema,conn_tgt,p_target_schema)
 		valid3_table_for_loop_cols(conn_src, p_source_schema, p_source_table=v_table_name, conn_tgt=conn_tgt, p_target_schema=p_target_schema,p_target_table=v_table_name)
 		i=i+1
 
-	save_xls(dfoutput, 'valid_main_schema_compare')
+	v_full_path_xlsx=p_output_folder + '\\valid_main_schema_compare.xlsx'
+	save_xls(dfoutput,v_full_path_xlsx )
 
-def valid_main_schema_rowcount_only(conn_src,dic_src,conn_tgt,p_target_schema,p_filter):
+#def save_xls(df,p_full_path_xlsx,p_sheet_name='validation'):
+
+
+def valid_main_schema_rowcount_only(conn_src,dic_src,conn_tgt,p_target_schema,p_filter,p_output_folder):
 #Receives two db and schema, and it will compare the structure and summary data for all the tables
 #depending on the database type, it will get the lsit of tables, then call a comparison with the target schema
 
@@ -352,7 +356,9 @@ def valid_main_schema_rowcount_only(conn_src,dic_src,conn_tgt,p_target_schema,p_
 		i=i+1
 		print('DEBUG-Table #',str(i), v_action, ' Table: ',v_table_case)
 
-	save_xls(dfoutput, 'valid_main_schema_rowcount_compare')
+	v_full_path_xlsx=p_output_folder + '\\valid_schema_rowcount_compare.xlsx'
+	save_xls(dfoutput,v_full_path_xlsx)
+
 
 
 def valid_bus_cus_views(conn_src,p_source_view,conn_tgt,p_target_view,p_column_order_by):

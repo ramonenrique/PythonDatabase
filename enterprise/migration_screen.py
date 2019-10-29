@@ -10,20 +10,21 @@ import linecache
 import psycopg2
 from pymssql import *
 import time
+
+#CUSTOM LIBRARIES
 from redshift_functions import *
 from mssql_functions import *
 from dos_util import *
 from validations import *
+from error_management import *
 
 #better to set this in the environment (computer) fixed permanentlyset path=% path %;C:\temp\mysqlsetup\mysql-8.0.17-winx64\bin
 
 #import tkinter as tk
 from tkinter import ttk
-import os
-import sys
-
 dos_command = ''
 global var_status_cumulative
+
 
 def build_redshift_dict():
 
@@ -37,6 +38,158 @@ def build_redshift_dict():
     }
 
     return(redshift_conn_dict)
+
+
+
+def test_connectivity_source(p_popup_msg=1):
+
+    try:
+        mdict = pack_mssql_var()
+        cm = connect_to_mssql_dict(mdict)
+        if p_popup_msg==1:
+            messagebox.showinfo('Connectivity Test', 'Successfully connected to Source database (MSSQL)')
+
+        print('try:Connection to MS SQL', ' OK', time.ctime())
+        print('try:Loading Schemas now', ' OK', time.ctime())
+#        load_schema_list_aurora() #need to reload schemas after a database change
+        return (1)
+    except:
+        #If this point is reached is because there was a real problem trying to connect.
+        print('EXCEPT:Connection to MS SQL', ' ERROR', time.ctime())
+        if p_popup_msg==1:
+            messagebox.showerror('EXCEPT:Connectivity Test', 'Failure connecting to Source database (MSSQL)')
+            exception_handler_screen()
+        else:
+            exception_handler()
+        return (-1)
+
+
+
+def test_connectivity_target(p_popup_msg=1):
+
+    #oldcr=connect_to_red_param( var_target_host.get(),str(var_target_port.get()),var_target_username.get(),var_target_password.get(),var_target_database.get())
+    rdict = build_redshift_dict()
+
+
+    try:
+        cr=connect_to_red_dict(rdict)
+        if p_popup_msg == 1:
+            messagebox.showinfo('Connectivity Test', 'Successfully connected to target database (Redshift)'
+                                )
+        print('Connection to Redshift', ' OK', time.ctime())
+        print('Loading Schemas now',  time.ctime())
+ #       load_schema_list_redshift()  # need to reload schemas after a database change
+        return (1)
+    except:
+        # If this point is reached is because there was a real problem trying to connect.
+        print('EXCEPT:Connection to Redshift', ' ERROR', time.ctime())
+        if p_popup_msg == 1:
+            messagebox.showerror('EXCEPT:Connectivity Test', 'Failure connecting to Source database (Redshift)')
+            exception_handler_screen()
+        else:
+            exception_handler()
+        return (-1)
+
+def test_connectivity_all(p_popup_msg=1):
+    
+    a=test_connectivity(p_popup_msg)
+    b=test_connectivity_target(p_popup_msg)
+
+    if a==1 and b==1:
+        return(1) #successfull
+    else: 
+        return(-1) #failure
+
+def test_input_variables_source():
+
+    v_error_msg01=f"Can not find bcp.exe in folder  {var_mysql_path.get()} \n Please check the folder is valid and file bcp.exe is there"
+    v_error_msg02=f"Can not find folder  {var_output_folder.get()} \n Please check the folder is valid."
+    v_error_msg03=f"The schema  {var_schema.get()} is not valid. \n Please check the schema name and try again."
+
+    display_message = v_error_msg01
+    var_check=var_mysql_path.get()
+    try:
+        #funciton isdir Return True if path is an existing directory. This follows symbolic links, so both islink() and isdir() can be true for the same path.
+        if not(os.path.isdir(var_check)):
+            messagebox.showerror('Error Input Validation', display_message)
+            return (-1)
+        else:
+            print('SOURCE CHECK1:os.path.isdir(var_mysql_path.get() OK:',var_check)
+    except:
+        display_message=v_error_msg01
+        messagebox.showerror('Error Input Validation', display_message)
+        return(-1)
+
+    display_message = v_error_msg02
+    var_check=var_output_folder.get()
+    try:
+        #funciton isdir Return True if path is an existing directory. This follows symbolic links, so both islink() and isdir() can be true for the same path.
+        if not(os.path.isdir(var_check)):
+            messagebox.showerror('Error', display_message)
+            return (-1)
+        else:
+            print('SOURCE CHECK2:os.path.isdir(var_mysql_path.get() OK:',var_check)
+    except:
+        display_message=v_error_msg02
+        print('SOURCE CHECK2:os.path.isdir(var_mysql_path.get() ERROR', var_check)
+        messagebox.showerror('Error Input Validation', display_message)
+        return(-1)
+
+    #how to validate that a schema exists?
+    #connect to database./list of schemas, does value exists in list?
+
+    try:
+        mdict=pack_mssql_var()
+        conn_mssql=connect_to_mssql_dict(mdict)
+
+        ls=db_list_all_schemas(p_conn=conn_mssql)
+        var_check=var_schema.get()
+        if var_check in ls:
+            print('SOURCE CHECK3:schema validated ok')
+        else:
+            print('SOURCE CHECK3: Schema is not valid, was not found on the list',var_check)
+            display_message=v_error_msg03
+            messagebox.showerror('Error', display_message)
+            return (-1)
+    except:
+        messagebox.showerror('Error Input Validation', 'Validation inputs:Error connecting to the MSSQL database')
+        print('SOURCE CHECK3:schema validated ok: ERROR')
+        exception_handler_screen()
+        return(-1)
+
+    display_message = "The filter established does not return any tables. Please check filter settings"
+    try:
+        mdict=pack_mssql_var()
+        conn_mssql=connect_to_mssql_dict(mdict)
+        conn_redshift = connect_to_red_param(var_target_host.get(), str(var_target_port.get()), var_target_username.get(),
+                                             var_target_password.get(), var_target_database.get())
+        lt= mssql_list_tables_to_export(p_conn_mssql=conn_mssql, v_source_schema=var_schema.get(), p_conn_redshift=conn_redshift,
+                                                              p_target_schema=var_target_schema.get(), p_filter=get_filter_value())
+        try:
+            x=len(lt)
+            print('the length of the list is ',x)
+        except:
+            print('List is empty or invalid')
+            messagebox.showerror('Error Input Validation', display_message)
+            return (-1)
+
+        if x==0:
+            print('List is empty')
+            messagebox.showerror('Error Input Validation', display_message)
+            return (-1)
+    except:
+        display_message = "Error getting the list of tables to process."
+        messagebox.showerror('Error Input Validation', display_message)
+        return(-1)
+
+    #this only will happen if all the checks were successfull
+    return(1)
+
+def test_input_variables_target():
+    v_error_msg04="Can not access the specified s3 bucket"
+    v_error_msg05="Can not find folder X .Please check the folder is valid."
+    v_error_msg06="The IAM role is not valid"
+    v_error_msg07= "The schema X is not valid. Please check the schema name and try again."
 
 def show_entry_fields():
     # global var_host
@@ -82,72 +235,54 @@ def show_entry_fields():
     print(vinfo)
     messagebox.showinfo('List of inputs from user',vinfo)
 
+def load_schema_list_aurora():
+    global comboSchema
+    global var_schema
 
-def test_connectivity(p_popup_msg=1):
-
-    mdict=pack_mssql_var()
-    cm=connect_to_mssql_dict(mdict)
-    
-    if cm!=-1:
-        if p_popup_msg==1:
-            messagebox.showinfo('Connectivity Test Source', 'Successfull')
-            print('Connection to MS SQL', ' OK', time.ctime())
-            return (1)
-    else:
-        if p_popup_msg==1:
-            messagebox.showerror('Connectivity Test Source', 'Failure')
-        print('Connection to MS SQL', ' ERROR', time.ctime())
-        return (-1)
-
-
-def test_connectivity_target(p_popup_msg=1):
-
-    #oldcr=connect_to_red_param( var_target_host.get(),str(var_target_port.get()),var_target_username.get(),var_target_password.get(),var_target_database.get())
-    rdict = build_redshift_dict()
-    cr=connect_to_red_dict(rdict)
-
-    if cr!=-1:
-        if p_popup_msg == 1:
-            messagebox.showinfo('Connectivity test TARGET', 'Successfull')
-        print('test_connectivity_target:Connection to redshift', 'Successfull', time.ctime())
-        return (1)
-    else:
-        if p_popup_msg == 1:
-            messagebox.showerror('Connectivity Test Target', 'Failure')
-        print('test_connectivity_target:Connection to redshift:', '***ERRROR***', time.ctime())
-        return (-1)
+    try:
+        print('debug:test_connectivity_source BEFORE')
+        rc=test_connectivity_source(p_popup_msg=0)
+        print('debug:test_connectivity_source AFTER: return code is',rc)
+        if rc==1:
+            #Doing the test connectivity guarantees the problem will not error out.
+            mdict = pack_mssql_var()
+            conn_mssql = connect_to_mssql_dict(mdict)
+            ls = db_list_all_schemas(p_conn=conn_mssql)
+            comboSchema.config(values = ls)
+            var_schema.set(ls[0])
+            print('load_schema_list_aurora:Schemas loaded successfully')
+            messagebox.showinfo('Info',"Schemas for Aurora loaded successfully. You can select the schemas now")
+        else:
+            comboSchema.config(values=[""])
+            var_schema.set('<<Please set connection and load>>')
+            print('ELSE:load_schema_list_aurora: Could not set predefined schemas, assigning blank schema')
+    except:
+        comboSchema.config(values=[""])
+        var_schema.set('<<Please set connection and load>>')
+        print('EXCEPT:load_schema_list_aurora: Could not set predefined schemas, assigning blank schema')
+        messagebox.showerror('ERROR',"Could not connect to the database and load the schemas")
 
 
-def test_connectivity_all(p_popup_msg=1):
-    
-    a=test_connectivity(p_popup_msg)
-    b=test_connectivity_target(p_popup_msg)
+def load_schema_list_redshift():
+    global comboSchema
+    global var_target_schema
 
-    if a==1 and b==1:
-        return(1) #successfull
-    else: 
-        return(-1) #failure
-    
-
-def load_schema__aurora_list():
-    global var_host
-    global var_port
-    global var_username
-    global var_password
-
-    conn_aurora = connect(host=var_host.get(), port=var_port.get(), user=var_username.get(),passwd=var_password.get(), db='bwpgmsdefault')
-    list_schema_combo = ["<***All Schemas***>"]
-    #PENDING CHANGE AURORA TO MSSQL
-    # list_schema_db=db_list_all_schemas(conn_aurora)
-    # list_schema_combo=list_schema_combo+list_schema_db
-    #
-    # comboDomains.config(values = list_schema_combo)
-    var_database.set("<***All Schemas***>")  # this can be a dropbox
-
-    return(list_schema_db)
-
-def window_update():
-    window.update()
+    try:
+        if test_connectivity_target()==1:
+            rdict = build_redshift_dict()
+            conn_redshift = connect_to_red_dict(rdict)
+            ls = db_list_all_schemas(p_conn=conn_redshift)
+            comboTargetSchemas.config(values=ls)
+            var_target_schema.set(ls[0])
+            messagebox.showinfo('Info',"Schemas for redshift loaded successfully. You can select the schemas now")
+        else:
+            comboTargetSchemas.config(values=[" "])
+            var_target_schema.set("Please load schema list")
+    except:
+        print('ELSE:load_schema_list_redshift:Can not connect using the default credentials-Schemas need to be loaded later')
+        #messagebox.info('Info','Could not connect with the default connection, please adjust them and try loading schemas')
+        comboTargetSchemas.config(values=[" "])
+        var_target_schema.set("EXCEPT:Please load schema list")
 
 
 def set_status_processing(counter_all,x_db):
@@ -224,7 +359,7 @@ def set_server_default():
     var_port.set(1505)
     var_username.set("rsalazar")
     var_database.set("QPTM_GC")  # this can be a dropbox
-    var_schema.set("dbo")  # this can be a dropbox
+    var_schema.set("<<Load and select schemas>>")  # this can be a dropbox
 
     var_target_host.set("bwp-gms-data-dev.cwkyrxg2o0p1.us-east-1.redshift.amazonaws.com")
     var_target_port.set(5439)
@@ -286,7 +421,7 @@ def set_other_defaults():
     var_copy_cmd_options.set("gzip  json \'auto\'")
     RadiobuttonInt.set(1)
     var_run_mode.set('execute')
-    var_target_schema.set('qptm_gc')
+    var_target_schema.set('<<Load Schemas>>')
 
 
 def pack_copy_cmd_entries():
@@ -301,6 +436,7 @@ def pack_copy_cmd_entries():
 
 def create_source_data_frame(window):
 
+
     fr_configure_db = Frame(window, bg="grey96",highlightthickness=2,highlightcolor="cyan",highlightbackground="RoyalBlue4")
 
     # All the labels
@@ -310,10 +446,7 @@ def create_source_data_frame(window):
     Label(fr_configure_db, text="Username").grid(row=3, column=0, sticky=E)
     Label(fr_configure_db, text="Password").grid(row=4, column=0, sticky=E)
     Label(fr_configure_db, text="Database").grid(row=5, column=0, sticky=E)
-    #Label(fr_configure_db, text="Schema").grid(row=6, column=0, sticky=E)
-
-    # Label(fr_configure_db, text="bcp.exe path").grid(row=7, column=0, sticky=E)
-    # Label(fr_configure_db, text="JSON Output Folder:").grid(row=8, column=0, sticky=E)
+    myemptyline=Label(fr_configure_db, text="         ")
 
     # All the inputs
     input_port = Entry(fr_configure_db, textvariable=var_port)
@@ -323,7 +456,9 @@ def create_source_data_frame(window):
     input_password = Entry(fr_configure_db, textvariable=var_password, show="*")
     # 5 is a ttk.Combobox
     comboDatabase = ttk.Combobox(fr_configure_db,values=['QPTM_GC','QPTM_GS','Gasquest'], textvariable=var_database, width=30)
-    comboSchema = ttk.Combobox(fr_configure_db,values=['dbo','pending_read_Schemas',], textvariable=var_schema, width=30)
+
+    button_test=Button(fr_configure_db, text='Test Connectivity source', command=test_connectivity_source)
+    button_reload_source_schema=Button(fr_configure_db, text='Load List of Schemas', command=load_schema_list_aurora)
 
 
     # input_path_exe = Entry(fr_configure_db, textvariable=var_mysql_path, width=50)
@@ -334,13 +469,14 @@ def create_source_data_frame(window):
     input_username.grid(row=3, column=2, sticky=W)
     input_password.grid(row=4, column=2, sticky=W)
     comboDatabase.grid(row=5, column=2, sticky=W)  # Database is line$3
-    # comboSchema.grid(row=6, column=2, sticky=W)  # Database is line$3
-    # input_path_exe.grid(row=7, column=2, sticky=W)
-    # input_out_folder.grid(row=8, column=2, sticky=W)
-
+    myemptyline.grid(row=6, column=1) #,fg="grey96",bg="grey96")
+    button_test.grid(row=7,column=2,sticky=W)
+    button_reload_source_schema.grid(row=8,column=2,sticky=W)
     return (fr_configure_db)
 
 def create_import_options_frame(window):
+
+    global comboSchema
 
     fr_configure_db = Frame(window, bg="grey96",highlightthickness=2,highlightcolor="cyan",highlightbackground="RoyalBlue4")
 
@@ -355,7 +491,7 @@ def create_import_options_frame(window):
 
     input_path_exe = Entry(fr_configure_db, textvariable=var_mysql_path, width=70)
     input_out_folder = Entry(fr_configure_db, textvariable=var_output_folder, width=70)
-    comboSchema = ttk.Combobox(fr_configure_db,values=['dbo','pending_read_Schemas',], textvariable=var_schema, width=30)
+    comboSchema = ttk.Combobox(fr_configure_db,values=['undefined'], textvariable=var_schema, width=30)
 
     input_path_exe.grid(row=2, column=1, sticky=W)
     input_out_folder.grid(row=3, column=1, sticky=W)
@@ -364,6 +500,7 @@ def create_import_options_frame(window):
     return (fr_configure_db)
 
 def create_target_data_frame(window):
+
 
     fr_configure_db = Frame(window, bg="grey96",highlightthickness=2,highlightcolor="cyan",highlightbackground="RoyalBlue4")
 
@@ -376,22 +513,27 @@ def create_target_data_frame(window):
     Label(fr_configure_db, text="Password").grid(row=4, column=0, sticky=E)
     Label(fr_configure_db, text="Database").grid(row=5, column=0, sticky=E)
 
-    # Label(fr_configure_db, text="*Schema will be automatically appended to the end").grid(row=6, column=2, sticky=E)
-    # Label(fr_configure_db, text=" ").grid(row=7, column=0, sticky=E)
-    # Label(fr_configure_db, text="S3 path").grid(row=8, column=0, sticky=E)
+    myemptyline = Label(fr_configure_db, text="         ")
 
-    # All the inputs
+      # All the inputs
     input_port = Entry(fr_configure_db, textvariable=var_target_port)
     comboHost = ttk.Combobox(fr_configure_db, values=["127.0.0.1","bwp-gms-data-dev.cwkyrxg2o0p1.us-east-1.redshift.amazonaws.com"], textvariable=var_target_host,width=75)
     input_username = Entry(fr_configure_db, textvariable=var_target_username)
     input_password = Entry(fr_configure_db, textvariable=var_target_password, show="*")
     input_database = Entry(fr_configure_db, textvariable=var_target_database)
+    button_test=Button(fr_configure_db, text='Test Connectivity target', command=test_connectivity_target)
+    button_reload_target_schema=Button(fr_configure_db, text='Load List of Schemas', command=load_schema_list_redshift)
 
     comboHost.grid(row=1, column=1, sticky=W)
     input_port.grid(row=2, column=1, sticky=W)
     input_username.grid(row=3, column=1, sticky=W)
     input_password.grid(row=4, column=1, sticky=W)
     input_database.grid(row=5, column=1, sticky=W)
+    myemptyline.grid(row=6, column=1) #,fg="grey96",bg="grey96")
+
+    button_test.grid(row=7, column=1,sticky=W)
+    button_reload_target_schema.grid(row=8,column=1,sticky=W)
+
     #row7 is an empty line
 
     return (fr_configure_db)
@@ -399,6 +541,9 @@ def create_target_data_frame(window):
 
 
 def create_redshift_options_frame(window):
+
+    global comboTargetSchemas
+    global var_target_schema
 
     fr_configure_copycmd = Frame(window, highlightthickness=2,highlightcolor="cyan",highlightbackground="RoyalBlue4")
 
@@ -417,13 +562,15 @@ def create_redshift_options_frame(window):
     input_s3_bucket = Entry(fr_configure_copycmd, textvariable=var_s3_bucket,width=70)
     input_iam_role = Entry(fr_configure_copycmd, textvariable=var_iam_role, width=70)
     input_options = Entry(fr_configure_copycmd, textvariable=var_copy_cmd_options, width=30)
-    comboSchemas = ttk.Combobox(fr_configure_copycmd, values=["gasquest","gasquest2019","gmsdl","gmsdw","qptm_gc","qptm_gs"], textvariable=var_target_schema, width=60)
+    comboTargetSchemas = ttk.Combobox(fr_configure_copycmd, values=["Please connect and load schemas first"], textvariable=var_target_schema, width=60)
+
+    #hardcoded values "gasquest", "gasquest2019", "gmsdl", "gmsdw", "qptm_gc", "qptm_gs"
 
     input_s3_bucket.grid(row=2,column=1,sticky=W)
     input_iam_role.grid(row=3,column=1,sticky=W)
     input_options.grid(row=4,column=1,sticky=W)
     #empty_line=======row=5======================
-    comboSchemas.grid(row=6, column=1, sticky=W)
+    comboTargetSchemas.grid(row=6, column=1, sticky=W)
 
     return (fr_configure_copycmd)
 
@@ -431,20 +578,22 @@ def create_general_filter_frame(window):
 
 #select wich tables to filter (this is a general filter)
     global var_filter_word
+    global input_filter_word
 
     fr_general_filter = Frame(window, bg="grey96",highlightthickness=2,highlightcolor="cyan",highlightbackground="RoyalBlue4")
 
     title=Label(fr_general_filter, text="Which tables you want to process?",  bg="grey96")
     emptyline = Label(fr_general_filter, text="              ", bg="grey96")
 
-    filter_option1=Radiobutton(fr_general_filter, text="All tables", variable=RadiobuttonInt, value=1)
-    filter_option2=Radiobutton(fr_general_filter, text="Empty in target (pending)", variable=RadiobuttonInt, value=2)
-    filter_option3=Radiobutton(fr_general_filter, text="Filter by word (Case Sensitive)==>", variable=RadiobuttonInt, value=3)
+
+    filter_option1=Radiobutton(fr_general_filter, text="All tables", variable=RadiobuttonInt, value=1,command=control_input_filter_word)
+    filter_option2=Radiobutton(fr_general_filter, text="Filter by word (Case Sensitive)==>", variable=RadiobuttonInt, value=2, command=control_input_filter_word)
+    filter_option3=Radiobutton(fr_general_filter, text="Not loaded in target(compares)", variable=RadiobuttonInt, value=3, command=control_input_filter_word)
 
 
 #This adds the ability to specify a word
     var_filter_word=StringVar()
-    input_filter_word = Entry(fr_general_filter, textvariable=var_filter_word, width=20)
+    input_filter_word = Entry(fr_general_filter, textvariable=var_filter_word, width=20,bg="grey96",fg="grey96")
 
 
     title.grid(row=1, column=0,columnspan=2,sticky=N+S+E+W)
@@ -453,7 +602,7 @@ def create_general_filter_frame(window):
     filter_option3.grid(row=4, column=0, sticky=W)
     # label_filter_word.grid(row=3, column=1, sticky=W)
     emptyline.grid(row=5,column=0)
-    input_filter_word.grid(row=4,column=1,sticky=W)
+    input_filter_word.grid(row=3,column=1,sticky=W)
 
     # labelRunMode.grid(row=6, column=0, sticky=E)
     # ComboRunMode.grid(row=6, column=1, sticky=W)
@@ -472,9 +621,6 @@ def create_fr_button_connectivity():
     Button(fr_button, text='Set local defaults', command=set_local_putty_default).grid(row=1, column=1, sticky=W)
     Button(fr_button, text='Set server defaults', command=set_server_default).grid(row=1, column=2, sticky=W, pady=4)
 #    Label(fr_button, text="empty line  ", foreground="grey96", bg="grey96").grid(row=1, column=3, sticky=W)
-    Button(fr_button, text='Test Connectivity source', command=test_connectivity).grid(row=1, column=3,sticky=W)
-    Button(fr_button, text='Test Connectivity target', command=test_connectivity_target).grid(row=1, column=4,sticky=W)
-#    Button(fr_button, text='Show values for variables now', command=show_entry_fields).grid(row=1, column=4)
 
     return(fr_button)
 
@@ -509,11 +655,16 @@ def create_fr_utility_lists():
 
     fr_button_utility_lists = Frame(window, highlightthickness=2,highlightcolor="cyan",highlightbackground="RoyalBlue4")
 
-    Label(fr_button_utility_lists, text="UTILITIES",  bg="grey96").grid(row=0, column=0,columnspan=99)
-    Button(fr_button_utility_lists, text='List all empty tables (in target)', command=call_util_list_tables_a).grid(row=1, column=1, sticky=W, pady=4)
-    Button(fr_button_utility_lists, text='List all populated tables (in target)', command=call_util_list_tables_b).grid(row=2, column=1, sticky=W, pady=4)
-    Button(fr_button_utility_lists, text='List all tables (in target)', command=call_util_list_tables_c).grid(row=7, column=1, sticky=W, pady=4)
+    Label(fr_button_utility_lists, text="   ",  bg="grey96").grid(row=0, column=0)
+    Label(fr_button_utility_lists, text="   ",  bg="grey96").grid(row=0, column=1)
+    Label(fr_button_utility_lists, text="   ",  bg="grey96").grid(row=0, column=2)
+    Label(fr_button_utility_lists, text="   ",  bg="grey96").grid(row=0, column=3)
 
+    Label(fr_button_utility_lists, text="UTILITIES",  bg="grey96").grid(row=1, column=1,columnspan=2,sticky=E)
+
+    Button(fr_button_utility_lists, text='List all empty tables (in target)', command=call_util_list_tables_a).grid(row=2, column=1,columnspan=2,sticky=E)
+    Button(fr_button_utility_lists, text='List all populated tables (in target)', command=call_util_list_tables_b).grid(row=3, column=1,columnspan=2,sticky=E)
+    Button(fr_button_utility_lists, text='List all tables (in target)', command=call_util_list_tables_c).grid(row=4, column=1,columnspan=2,sticky=E)
 
     return (fr_button_utility_lists)
 
@@ -565,46 +716,71 @@ def pack_mssql_var():
     return(mssql_conn_dict)
 
 def step1_export():
-    mdict=pack_mssql_var()
-    v_mode=var_run_mode.get()
 
-    conn_mssql=connect_to_mssql_dict(mdict)
-    #print('debug:dictionary for bcp is',mdict)
-    #print('debug run mode is:', var_run_mode.get())
+    tc=test_connectivity_source(p_popup_msg=0)
+    if tc!=1:
+        messagebox.showinfo('t','Please fix Connectivity parameters first and try again')
+        return(-1)
 
-    conn_redshift = connect_to_red_param(var_target_host.get(), str(var_target_port.get()), var_target_username.get(),
-                                         var_target_password.get(), var_target_database.get())
+    ti=test_input_variables_source()
+    if ti!=1:
+        messagebox.showinfo('t','Please make sure Options and filter are correct and then try again')
+        print('program should stop here')
+        return(-1)
 
-    lt= mssql_list_tables_to_export(p_conn_mssql=conn_mssql, v_source_schema=var_schema.get(), p_conn_redshift=conn_redshift,
-                                                          p_target_schema=var_target_schema.get(), p_filter=get_filter_value())
+    try:
+        mdict=pack_mssql_var()
+        v_mode=var_run_mode.get()
 
-    print('step1_export:list tables to export:',lt)
-    rc=mssql_bcp_export_schema_json(p_conn_mssql=conn_mssql, p_mssql_conn_dict=mdict, p_list_tables=lt, p_mode= v_mode,p_exe_path=var_mysql_path.get(),p_output_folder=var_output_folder.get())
-    if rc!=1:
-        messagebox.showerror ('Error',rc)
+        conn_mssql=connect_to_mssql_dict(mdict)
+        #print('debug:dictionary for bcp is',mdict)
+        #print('debug run mode is:', var_run_mode.get())
+
+        conn_redshift = connect_to_red_param(var_target_host.get(), str(var_target_port.get()), var_target_username.get(),
+                                             var_target_password.get(), var_target_database.get())
+
+        lt= mssql_list_tables_to_export(p_conn_mssql=conn_mssql, v_source_schema=var_schema.get(), p_conn_redshift=conn_redshift,
+                                                              p_target_schema=var_target_schema.get(), p_filter=get_filter_value())
+
+        v_output_folder=var_output_folder.get()
+        print('step1_export:list tables to export:',lt)
+        rc=mssql_bcp_export_schema_json(p_conn_mssql=conn_mssql, p_mssql_conn_dict=mdict, p_list_tables=lt, p_mode= v_mode,p_exe_path=var_mysql_path.get(),p_output_folder=v_output_folder)
+
+        if v_mode=='print':
+            messagebox.showinfo('Info',f'The commands have been saved into the file {v_output_folder}\mssql_bcp_command.txt')
+    except:
+         exception_handler_screen()
 
 
 def step2_compress():
-    path_json_files=var_output_folder.get()+ "\\"+ var_database.get()
-    #dos_compress_files(path_json_files)
+    try:
+        path_json_files=var_output_folder.get()+ "\\"+ var_database.get()
+        #dos_compress_files(path_json_files)
+    except:
+         exception_handler_screen()
 
     try:
         rc=dos_compress_files(path_json_files)
         messagebox.showinfo ('Gzip compression',f'Gzip files compressed successfully {path_json_files}')
     except:
+        exception_handler_screen()
         messagebox.showerror('Gzip compression','Failure')
         #print('step2_compress():pending good error management')
 
 def step3_upload():
-    messagebox.showinfo('This is a manuaal step by now, copy all the files to the s3 bucket')
+    messagebox.showinfo('Info','This is a manuaal step by now, copy all the files to the s3 bucket using the AWS Management Console')
 
 def step4_run_redshift():
-    rdict = build_redshift_dict()
-    ccc=pack_copy_cmd_entries() #copy command configuration
 
-    #print('debug run mode is:',var_run_mode.get())
-    #pending work read preferences from interface and sent it along (mode/filter)
-    red_run_copy_command_schema(cdict=rdict, copy_cmd_cfg=ccc,p_run_mode=var_run_mode.get(), p_filter=get_filter_value())
+    try:
+        rdict = build_redshift_dict()
+        ccc = pack_copy_cmd_entries()  # copy command configuration
+        v_output_folder = var_output_folder.get()
+
+        red_run_copy_command_schema(cdict=rdict, copy_cmd_cfg=ccc,p_run_mode=var_run_mode.get(), p_filter=get_filter_value(),p_output_folder=v_output_folder)
+    except:
+        exception_handler_screen()
+
 
 
 def get_filter_value():
@@ -612,32 +788,45 @@ def get_filter_value():
     if RadiobuttonInt.get() == 1:
         v_filter_value="all"
     elif RadiobuttonInt.get() == 2:
-        v_filter_value="pending"
-    elif RadiobuttonInt.get() == 3:
         v_filter_value = var_filter_word.get()
         if len(v_filter_value)==0:
            messagebox.showerror('Read filter value', f'Please specify a word for the filter')
            v_filter_value=-1
+    elif RadiobuttonInt.get() == 3:
+        v_filter_value="pending"
 
     print('The value for the filter is:', v_filter_value)
     return (v_filter_value)
 
+def control_input_filter_word():
+
+    global input_filter_word
+
+    if RadiobuttonInt.get() == 2:
+        #enable
+        input_filter_word.config(bg="yellow",fg="blue")
+        print('trying to enable')
+    else:
+        input_filter_word.config(bg="grey96",fg="grey96")
+        print('trying to disable')
+
 
 def step5_validate():
+    try:
+        mdict=pack_mssql_var()
+        conn_mssql=connect_to_mssql_dict(mdict)
+        rdict = build_redshift_dict()
+        conn_redshift=connect_to_red_dict(rdict)
 
-    mdict=pack_mssql_var()
-    conn_mssql=connect_to_mssql_dict(mdict)
-    rdict = build_redshift_dict()
-    conn_redshift=connect_to_red_dict(rdict)
-
-    #pending validation of connection
-    v_filter_value = get_filter_value()
-    if v_filter_value != -1:
-        valid_main_schema_rowcount_only(conn_src=conn_mssql, dic_src=mdict, conn_tgt=conn_redshift,
-                                        p_target_schema=var_target_schema.get(), p_filter=v_filter_value)
-    else:
-        print('step5_validate/get_filter_value():problem getting filter value')
-
+        #pending validation of connection
+        v_filter_value = get_filter_value()
+        if v_filter_value != -1:
+            valid_main_schema_rowcount_only(conn_src=conn_mssql, dic_src=mdict, conn_tgt=conn_redshift,
+                                            p_target_schema=var_target_schema.get(), p_filter=v_filter_value,p_output_folder=var_output_folder.get())
+        else:
+            print('step5_validate/get_filter_value():problem getting filter value')
+    except:
+        exception_handler_screen()
 
     # ctest=test_connectivity_all(p_popup_msg=0)
     #
@@ -662,8 +851,6 @@ def step5_validate():
 #
 #
 
-
-
 list_schema_combo = []
 list_schema_combo.append("Configure and then load Schemas")
 # def clear_message():
@@ -673,7 +860,7 @@ list_schema_combo.append("Configure and then load Schemas")
 
 window = Tk()
 window.configure(background='gray96')
-window.geometry("1300x800+20+20")
+window.geometry("1400x800+5+5")
 vmycellsize = "                           "
 Label(window, text=vmycellsize).grid(row=0, column=0)
 vmycellsize = "                           "
@@ -724,6 +911,7 @@ RadiobuttonInt = IntVar()
 fr_left_source_db = create_source_data_frame(window)
 fr_right_source_db = create_target_data_frame(window)
 
+
 fr_redshift=create_redshift_options_frame(window)
 fr_import_options=create_import_options_frame(window)
 
@@ -738,10 +926,11 @@ fr_utility_lists=create_fr_utility_lists()
 set_local_putty_default()
 set_other_defaults()
 
-fr_left_source_db.grid(row=1, column=1,columnspan=2,sticky=W+E+N+S)
-fr_right_source_db.grid(row=1, column=3,columnspan=2,sticky=W+E+N+S)
+fr_button_connectivity.grid(row=1,column=1,columnspan=4,sticky=W+E+N+S)
 
-fr_button_connectivity.grid(row=2,column=1,columnspan=4,sticky=W+E+N+S)
+fr_left_source_db.grid(row=2, column=1,columnspan=2,sticky=W+E+N+S)
+fr_right_source_db.grid(row=2, column=3,columnspan=2,sticky=W+E+N+S)
+
 
 fr_import_options.grid(row=3,column=1,columnspan=2,sticky=W+E+N+S)
 fr_redshift.grid(row=3,column=3,columnspan=2,sticky=W+E+N+S)
@@ -749,7 +938,7 @@ fr_redshift.grid(row=3,column=3,columnspan=2,sticky=W+E+N+S)
 fr_general_filter.grid(row=4,column=1,sticky=N+S) #+E+N+S)
 fr_button_steps.grid(row=4,column=2,sticky=W) # columnspan=2,rowspan=1)
 
-fr_utility_lists.grid(row=4,column=3,columnspan=2,rowspan=2,sticky=W+E+N+S)
+fr_utility_lists.grid(row=4,column=3,columnspan=3,rowspan=2,sticky=W+E+N+S)
 
 emptyline = Label(window, text="              ", bg="grey96")
 emptyline.grid(row=5, column=0)
@@ -757,7 +946,7 @@ emptyline.grid(row=6, column=0)
 
 
 b_quit=Button(window, text='Quit', command=window.quit)
-b_quit.config( height = 3, width = 2 )
+b_quit.config( height = 3, width = 1 )
 b_quit.grid(row=7, column=4, sticky=W+E+N+S)
 
 #Placement
@@ -768,6 +957,10 @@ sepline_result2=Label(window, text=' ')
 sepline_result1.grid(row=8,column=0)
 sepline_result2.grid(row=9,column=0)
 #fr_result.grid(row=8,column=0) #frame#3
+
+
+# load_schema_list_redshift()
+# load_schema_list_aurora()
 
 
 window.mainloop()

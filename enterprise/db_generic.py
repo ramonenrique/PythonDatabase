@@ -1,4 +1,18 @@
 import pandas as pd
+import os, sys
+import traceback
+
+def exception_handler():
+	print('DB GENERIC  ERROR HANDLING')
+	exc_type, exc_obj, exc_traceback = sys.exc_info() #this helps split the components right away
+	v_msg='\n [Exception Type]:' + str(exc_type)
+	v_msg = v_msg + '\n [Error message]:' + exc_obj.args[0]
+	v_msg = v_msg + '\n [File Name:]' +  os.path.split(exc_traceback.tb_frame.f_code.co_filename)[1]
+	v_msg = v_msg + '\n [Line Number]:' + str(exc_traceback.tb_lineno)
+	print(v_msg)
+	raise
+
+
 
 def db_database_type(conn):
 
@@ -33,7 +47,7 @@ def db_get_row_count_in_db(conn1,p_schema,p_table):
 		val_rowcount = rec[0]
 		cur.close()
 		return(val_rowcount)
-	except:
+	except: #pending one could list exactly the exception type here for this scenario
 		print('db_get_row_count_in_db',' there was a problem getting the rowcount for this table',v_sqlcount)
 		return(-1)
 
@@ -54,7 +68,8 @@ def db_read_table_top_n(p_conn_database,p_schema,p_table_name, p_top_n_rows):
 	except:
 		#sqlstmt1='select top({0)} from {1}'.format(p_top_n_rows, p_table_name)
 		print('Error connecting to database-ABORTING','sqlstmt used',sqlstmt1)
-		return pd.DataFrame() #returns an empty dataframe
+		exception_handler()
+		#return pd.DataFrame() #returns an empty dataframe
 
 	#print('Loading top X rows into panda dataframe using the folloiwng SQL statement')
 	#print('------>',sqlstmt1)
@@ -62,8 +77,9 @@ def db_read_table_top_n(p_conn_database,p_schema,p_table_name, p_top_n_rows):
 		panda_df = pd.read_sql(sqlstmt1, con=p_conn_database)
 		#print(p_table_name,'Dataframe loaded:',panda_df.shape[0])
 	except:
-		print(p_table_name, 'Error reading dataframe')
-		return pd.DataFrame()
+		print(p_table_name, 'db_read_table_top_n:Error reading dataframe')
+		#return pd.DataFrame()
+		exception_handler()
 
 	return panda_df
 
@@ -83,8 +99,9 @@ def db_list_all_tables(p_conn, p_schema):
 		list_all = df_list_all['table_name'].values.tolist()
 		return(list_all)
 	except:
-		print('List of populated tables', ' ***ERROR***')
-		return (None)  ##empty list
+		print('db_list_all_tables:List of populated tables', ' ***ERROR***')
+		#return (None)  ##empty list
+		exception_handler()
 
 
 def db_dataframe_all_tables(p_conn, p_schema):
@@ -101,8 +118,8 @@ def db_dataframe_all_tables(p_conn, p_schema):
 		print('List of all  tables in schema created', ' sucessfully', " length= ", len(df_list_all))
 		return (df_list_all)
 	except:
-		print('List of populated tables', ' ***ERROR***')
-		return (None)  ##empty list
+		print('db_dataframe_all_tables:List of populated tables', ' ***ERROR***')
+		exception_handler()
 
 
 def db_list_all_schemas(p_conn):
@@ -111,14 +128,16 @@ def db_list_all_schemas(p_conn):
 	try:
 		v_sql_list_schema = " select distinct ist.table_schema as table_schema\
 								from  INFORMATION_SCHEMA.TABLES ist \
-								where ist.table_type = 'BASE TABLE' order by ist.table_name "
+								where ist.table_type = 'BASE TABLE' order by ist.table_schema "
 
 		df_list_schema = pd.read_sql(v_sql_list_schema, con=p_conn)  # user svc_integration needs permissions to
 
-		print('List of all  tables in schema created', ' sucessfully', " length= ", len(df_list_schema))
 		list_schema = df_list_schema['table_schema'].values.tolist()
 		list_schema.sort()
+		print('List of all  Schemas created sucessfully length=', len(list_schema))
+		print(list_schema)
 		return(list_schema)
 	except:
 		print('List of populated tables', ' ***ERROR***')
-		return (None)  ##empty list
+		exception_handler()
+		#return (None)  ##empty list
